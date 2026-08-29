@@ -2208,6 +2208,42 @@ int MMG5_bdrySet(MMG5_pMesh mesh) {
     }
   }
 
+  /* Required edges supplied through the API are initially stored in the
+   * geometric-edge hash.  Historically bdrySet transferred those tags only
+   * through retained boundary triangles.  An embedded physical curve can be
+   * supported by tetrahedra while its user-supplied triangle is classified as
+   * an extra boundary and discarded; in that case the required tag vanished
+   * before the volume swap pass.  Transfer MG_REQ directly to every tetra edge
+   * that matches the input hash.  This protects only the edge: no adjacent
+   * face is marked required. */
+  if ( mesh->htab.geom ) {
+    MMG5_int edgeRef;
+    for (k=1; k<=mesh->ne; ++k) {
+      pt = &mesh->tetra[k];
+      if ( !MG_EOK(pt) || (pt->tag & MG_OVERLAP) ) continue;
+      for (i=0; i<6; ++i) {
+        ia = pt->v[MMG5_iare[i][0]];
+        ib = pt->v[MMG5_iare[i][1]];
+        if ( !MMG5_hGet(&mesh->htab,ia,ib,&edgeRef,&tag) ||
+             !(tag & MG_REQ) ) continue;
+        if ( !pt->xt ) {
+          ++mesh->xt;
+          if ( mesh->xt > mesh->xtmax ) {
+            MMG5_TAB_RECALLOC(mesh,mesh->xtetra,mesh->xtmax,MMG5_GAP,
+                              MMG5_xTetra,"larger xtetra table",
+                              --mesh->xt;
+                              fprintf(stderr,"  Exit program.\n");return 0;);
+          }
+          pt->xt = mesh->xt;
+        }
+        pxt = &mesh->xtetra[pt->xt];
+        pxt->tag[i] |= MG_REQ;
+        pxt->tag[i] &= ~MG_NOSURF;
+        pxt->edg[i] = MG_MAX(pxt->edg[i],edgeRef);
+      }
+    }
+  }
+
   if ( !mesh->nprism ) {
     MMG5_DEL_MEM(mesh,hash.item);
     return 1;
