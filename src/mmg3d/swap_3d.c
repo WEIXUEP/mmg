@@ -76,6 +76,19 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
 
   np = pt->v[MMG5_iare[ia][0]];
   nq = pt->v[MMG5_iare[ia][1]];
+  int trace_boundary_reject = getenv("MMG_TRACE_BOUNDARY_REJECT") != NULL;
+  MMG5_int trace_start_iel = iel;
+#define MMG_TRACE_242_REJECT(reason) do {                                 \
+  if ( trace_boundary_reject )                                            \
+    fprintf(stderr,"MMG_BOUNDARY_REJECT edge %" MMG5_PRId " %"          \
+        MMG5_PRId " start %" MMG5_PRId " local_edge %d reason %s\n",    \
+        np,nq,trace_start_iel,(int)ia,reason);                            \
+  return 0;                                                              \
+} while (0)
+  if ( trace_boundary_reject )
+    fprintf(stderr,"MMG_BOUNDARY_CHECK edge %" MMG5_PRId " %" MMG5_PRId
+        " start %" MMG5_PRId " local_edge %d ring %d\n",np,nq,iel,
+        (int)ia,ilist);
 
   // Algiane 05/04/24: I think that the assumption that was previously made that
   // we can arrive from a tetrahedra without a boundary face (i.e. without an
@@ -85,7 +98,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
   /* No swap of geometric edge */
   pxt = &mesh->xtetra[pt->xt];
   if ( (pxt->edg[ia]>0) || MG_EDG_OR_NOM(pxt->tag[ia]) || (pxt->tag[ia] & MG_REQ) ) {
-    return 0;
+    MMG_TRACE_242_REJECT("geometric-or-required-edge");
   }
 
   /* No swap when either internal or external component has only 1 element (as
@@ -103,7 +116,8 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
       nplus++;
     }
   }
-  if ( nplus == 1 || nminus == 1 )  return 0;
+  if ( nplus == 1 || nminus == 1 )
+    MMG_TRACE_242_REJECT("one-element-component");
 
   iel1 = it1 / 4;
   ifa1 = it1 % 4;
@@ -120,7 +134,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
     if ( (tt1.v[ia1] != np) && (tt1.v[ia1] != nq) )  break;
   }
   assert( ia1 < 3 );
-  if ( ia1==3 ) return 0;
+  if ( ia1==3 ) MMG_TRACE_242_REJECT("missing-first-face-anchor");
 
   assert( (tt1.v[MMG5_inxt2[ia1]] == np && tt1.v[MMG5_iprv2[ia1]] == nq) ||
           (tt1.v[MMG5_inxt2[ia1]] == nq && tt1.v[MMG5_iprv2[ia1]] == np) );
@@ -131,11 +145,14 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
   }
 
   assert ( ia2 < 3 );
-  if ( ia2 ==3 ) return 0;
+  if ( ia2 ==3 ) MMG_TRACE_242_REJECT("missing-second-face-anchor");
 
   assert ( (tt2.v[MMG5_inxt2[ia2]] == np && tt2.v[MMG5_iprv2[ia2]] == nq) ||
            (tt2.v[MMG5_inxt2[ia2]] == nq && tt2.v[MMG5_iprv2[ia2]] == np) );
   na2 = tt2.v[ia2];
+  if ( trace_boundary_reject )
+    fprintf(stderr,"MMG_BOUNDARY_ANCHOR start %" MMG5_PRId " na1 %"
+        MMG5_PRId " na2 %" MMG5_PRId "\n",trace_start_iel,na1,na2);
 
   /* Check non convexity (temporarily use b0,b1)*/
   MMG5_norpts(mesh,tt1.v[ia1],tt1.v[MMG5_inxt2[ia1]],tt2.v[ia2],b0);
@@ -144,45 +161,43 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
 
   /* Here we put ANGEDG because in nr mode the test over dhd may create inverted
    * tetra */
-  if ( ps < MMG5_ANGEDG ) {
-    return 0;
-  }
+  if ( ps < MMG5_ANGEDG ) MMG_TRACE_242_REJECT("non-convex");
 
   /* Check normal deviation with neighbours */
   if ( !MG_GEO_OR_NOM( tt1.tag[MMG5_iprv2[ia1]] ) ) {
     ier = MMG3D_normalAdjaTri(mesh,iel1,ifa1,MMG5_iprv2[ia1],n);
     if ( ier < 0 ) return -1;
-    else if ( !ier ) return 0;
+    else if ( !ier ) MMG_TRACE_242_REJECT("normal-1-unavailable");
     ps = b0[0]*n[0] + b0[1]*n[1] + b0[2]*n[2];
 
-    if ( ps < mesh->info.dhd )  return 0;
+    if ( ps < mesh->info.dhd ) MMG_TRACE_242_REJECT("normal-1-deviation");
   }
 
   if ( !MG_GEO_OR_NOM( tt2.tag[MMG5_inxt2[ia2]]) ) {
     ier = MMG3D_normalAdjaTri(mesh,iel2,ifa2,MMG5_inxt2[ia2],n);
     if ( ier<0 ) return -1;
-    else if ( !ier ) return 0;
+    else if ( !ier ) MMG_TRACE_242_REJECT("normal-2-unavailable");
     ps = b0[0]*n[0] + b0[1]*n[1] + b0[2]*n[2];
 
-    if ( ps < mesh->info.dhd )  return 0;
+    if ( ps < mesh->info.dhd ) MMG_TRACE_242_REJECT("normal-2-deviation");
   }
 
   if ( !MG_GEO_OR_NOM( tt1.tag[MMG5_inxt2[ia1]] ) ) {
     ier = MMG3D_normalAdjaTri(mesh,iel1,ifa1,MMG5_inxt2[ia1],n);
     if ( ier<0 ) return -1;
-    else if ( !ier ) return 0;
+    else if ( !ier ) MMG_TRACE_242_REJECT("normal-3-unavailable");
     ps = b1[0]*n[0] + b1[1]*n[1] + b1[2]*n[2];
 
-    if ( ps < mesh->info.dhd )  return 0;
+    if ( ps < mesh->info.dhd ) MMG_TRACE_242_REJECT("normal-3-deviation");
   }
 
   if ( !MG_GEO_OR_NOM(tt2.tag[MMG5_iprv2[ia2]]) ) {
     ier = MMG3D_normalAdjaTri(mesh,iel2,ifa2,MMG5_iprv2[ia2],n);
     if ( ier<0 ) return -1;
-    else if ( !ier ) return 0;
+    else if ( !ier ) MMG_TRACE_242_REJECT("normal-4-unavailable");
     ps = b1[0]*n[0] + b1[1]*n[1] + b1[2]*n[2];
 
-    if ( ps < mesh->info.dhd )  return 0;
+    if ( ps < mesh->info.dhd ) MMG_TRACE_242_REJECT("normal-4-deviation");
   }
 
   /* Compare contributions to Hausdorff distance in both configurations */
@@ -310,7 +325,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
   dischg = MG_MAX(dischg,c[0]*c[0] + c[1]*c[1] + c[2]*c[2]);
   dischg = MG_MAX(dischg,hausd * hausd);
 
-  if ( dischg > disnat )   return 0;
+  if ( dischg > disnat ) MMG_TRACE_242_REJECT("hausdorff");
 
   if ( typchk==1 && met->size > 1 && met->m ) {
     cal1 = MMG5_caltri33_ani(mesh,met,&tt1);
@@ -337,7 +352,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
   }
 
   calchg = MG_MIN(cal1,cal2);
-  if ( calchg < 1.01 * calnat )  return 0;
+  if ( calchg < 1.01 * calnat ) MMG_TRACE_242_REJECT("surface-quality");
 
   /* Check mechanical validity of forthcoming operations */
   p0 = &mesh->point[np];
@@ -368,11 +383,11 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
 
     if ( typchk == 1 && (met->size>1) ) {
       if ( MMG3D_intmet33_ani(mesh,met,list[0]/6,list[0]%6,0,0.5) <= 0 )
-        return 0;
+        MMG_TRACE_242_REJECT("midpoint-metric-anisotropic");
     }
     else {
       if ( MMG5_intmet(mesh,met,list[0]/6,list[0]%6,0,0.5) <= 0 )
-        return 0;
+        MMG_TRACE_242_REJECT("midpoint-metric-isotropic");
     }
   }
 
@@ -404,7 +419,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
       caltmp = MMG5_orcal(mesh,met,0);
 
 
-    if ( caltmp < MMG5_NULKAL )  return 0;
+    if ( caltmp < MMG5_NULKAL ) MMG_TRACE_242_REJECT("split-np-invalid");
 
     if ( !isshell ) {
       /* Test that we don't recreate an existing elt */
@@ -414,7 +429,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
         adj /= 4;
 
         if ( mesh->tetra[adj].v[voy] == na1 ) {
-          return 0;
+          MMG_TRACE_242_REJECT("duplicate-after-np-collapse");
         }
       }
 
@@ -436,7 +451,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
     else
       caltmp = MMG5_orcal(mesh,met,0);
 
-    if ( caltmp < MMG5_NULKAL )  return 0;
+    if ( caltmp < MMG5_NULKAL ) MMG_TRACE_242_REJECT("split-nq-invalid");
 
     if ( !isshell ) {
       /* Test that we don't recreate an existing elt */
@@ -446,7 +461,7 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
         adj /= 4;
 
         if ( mesh->tetra[adj].v[voy] == na1 ) {
-          return 0;
+          MMG_TRACE_242_REJECT("duplicate-after-nq-collapse");
         }
       }
 
@@ -458,15 +473,27 @@ int MMG5_chkswpbdy(MMG5_pMesh mesh, MMG5_pSol met, int64_t *list,int ilist,
       else
         caltmp = MMG5_orcal(mesh,met,0);
 
-      if ( caltmp < MMG5_NULKAL )  return 0;
+      if ( caltmp < MMG5_NULKAL )
+      {
+        if ( trace_boundary_reject )
+          fprintf(stderr,"MMG_BOUNDARY_INVALID_TET start %" MMG5_PRId
+              " old %" MMG5_PRId " %" MMG5_PRId " %" MMG5_PRId " %"
+              MMG5_PRId " nq-slot %d anchor %" MMG5_PRId " quality %.17g\n",
+              trace_start_iel,pt->v[0],pt->v[1],pt->v[2],pt->v[3],
+              (int)iq,na1,caltmp);
+        MMG_TRACE_242_REJECT("collapsed-nq-invalid");
+      }
 
       calnew = MG_MIN(calnew,caltmp);
     }
   }
-  if ( calold < MMG5_EPSOK && calnew <= calold ) return 0;
+  if ( calold < MMG5_EPSOK && calnew <= calold )
+    MMG_TRACE_242_REJECT("invalid-old-quality");
 
-  else if ( calnew < 0.3 * calold )  return 0;
+  else if ( calnew < 0.3 * calold )
+    MMG_TRACE_242_REJECT("volume-quality");
 
+#undef MMG_TRACE_242_REJECT
   return 1;
 }
 

@@ -59,7 +59,7 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
   MMG5_pTetra    pt,pt0;
   MMG5_pPoint    p0;
   double         calold,calnew,caltmp;
-  int            npol,k,l;
+  int            npol,k,l,trace_target;
   MMG5_int       np,na,nb,piv,*adja,adj,pol[MMG3D_LMAX+2],iel,refdom;
   int8_t         i,ip,ier,ifac;
 
@@ -69,6 +69,7 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
   pt0 = &mesh->tetra[0];
   na  = pt->v[MMG5_iare[ia][0]];
   nb  = pt->v[MMG5_iare[ia][1]];
+  trace_target = getenv("MMG_TRACE_SWAP_PARITY") != NULL;
   calold = pt->qual;
 
   /* Store shell of ia in list, and associated pseudo polygon in pol */
@@ -144,6 +145,8 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
     iel = pol[k] / 4;
     ip  = pol[k] % 4;
     np  = mesh->tetra[iel].v[ip];
+    if ( trace_target )
+      fprintf(stderr,"MMG_PARITY try root_index %d root %" MMG5_PRId "\n",k,np);
     calnew = 1.0;
     ier = 1;
 
@@ -172,7 +175,10 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
           }
         }
       }
-      if ( !ier )  continue;
+      if ( !ier ) {
+        if ( trace_target ) fprintf(stderr,"MMG_PARITY reject root %" MMG5_PRId " boundary-pair\n",np);
+        continue;
+      }
       ier = 1;
     }
 
@@ -196,12 +202,14 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
       adj = adja[MMG5_iare[i][0]]/4;
       piv = adja[MMG5_iare[i][0]]%4;
       if ( adj && mesh->tetra[adj].v[piv]==np ) {
+        if ( trace_target ) fprintf(stderr,"MMG_PARITY reject root %" MMG5_PRId " duplicate-side0\n",np);
         ier = 0;
         break;
       }
       adj = adja[MMG5_iare[i][1]]/4;
       piv = adja[MMG5_iare[i][1]]%4;
       if ( adj && mesh->tetra[adj].v[piv]==np ) {
+        if ( trace_target ) fprintf(stderr,"MMG_PARITY reject root %" MMG5_PRId " duplicate-side1\n",np);
         ier = 0;
         break;
       }
@@ -213,6 +221,7 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
           if ( ( mesh->point[pt->v[MMG5_iare[i][0]]].tag & MG_BDY ) ||
                ( mesh->point[pt->v[MMG5_iare[i][1]]].tag & MG_BDY ) ) {
             ier = 0;
+            if ( trace_target ) fprintf(stderr,"MMG_PARITY reject root %" MMG5_PRId " four-boundary-vertices\n",np);
             break;
           }
         }
@@ -231,7 +240,10 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
       calnew = MG_MIN(calnew,caltmp);
 
       ier = (calnew > crit*calold);
-      if ( !ier )  break;
+      if ( !ier ) {
+        if ( trace_target ) fprintf(stderr,"MMG_PARITY reject root %" MMG5_PRId " quality-first %.17g <= %.17g\n",np,calnew,crit*calold);
+        break;
+      }
 
       /* Second tetra obtained from iel */
       memcpy(pt0,pt,sizeof(MMG5_Tetra));
@@ -245,9 +257,53 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
       calnew = MG_MIN(calnew,caltmp);
 
       ier = (calnew > crit*calold);
-      if ( !ier )  break;
+      if ( !ier ) {
+        if ( trace_target ) fprintf(stderr,"MMG_PARITY reject root %" MMG5_PRId " quality-second %.17g <= %.17g\n",np,calnew,crit*calold);
+        break;
+      }
     }
-    if ( ier )  return pol[k];
+    if ( ier ) {
+      /* Temporary parity trace for the Omega_h native swap implementation.
+       * Keep it environment-gated so normal MMG runs are unchanged. */
+      if ( trace_target ) {
+        fprintf(stderr,"MMG_PARITY edge %" MMG5_PRId " %" MMG5_PRId
+                       " start %" MMG5_PRId " local_edge %d ring %d root_index %d root %" MMG5_PRId
+                       " nconf %" MMG5_PRId " old_min %.17g new_min %.17g\n",
+                na,nb,start,(int)ia,*ilist,k,np,pol[k],calold,calnew);
+        fprintf(stderr,"MMG_PARITY polygon");
+        for (l=0; l<npol; ++l) {
+          iel = pol[l] / 4;
+          ip  = pol[l] % 4;
+          fprintf(stderr," %" MMG5_PRId,mesh->tetra[iel].v[ip]);
+        }
+        fprintf(stderr,"\nMMG_PARITY old_tets");
+        for (l=0; l<(*ilist); ++l) {
+          iel = list[l] / 6;
+          pt = &mesh->tetra[iel];
+          fprintf(stderr," [%" MMG5_PRId ",%" MMG5_PRId ",%" MMG5_PRId
+                         ",%" MMG5_PRId "]",
+                  pt->v[0],pt->v[1],pt->v[2],pt->v[3]);
+        }
+        fprintf(stderr,"\nMMG_PARITY child_tets");
+        for (l=0; l<(*ilist); ++l) {
+          if ( (k < npol-1 && (l == k || l == k+1)) ||
+               (k == npol-1 && (l == npol-1 || l == 0)) ) continue;
+          iel = list[l] / 6;
+          i   = list[l] % 6;
+          pt = &mesh->tetra[iel];
+          fprintf(stderr," [%" MMG5_PRId ",%" MMG5_PRId ",%" MMG5_PRId
+                         ",%" MMG5_PRId "]",
+                  np,pt->v[MMG5_iare[i][1]],
+                  pt->v[MMG5_ifar[i][0]],pt->v[MMG5_ifar[i][1]]);
+          fprintf(stderr," [%" MMG5_PRId ",%" MMG5_PRId ",%" MMG5_PRId
+                         ",%" MMG5_PRId "]",
+                  pt->v[MMG5_iare[i][0]],np,
+                  pt->v[MMG5_ifar[i][0]],pt->v[MMG5_ifar[i][1]]);
+        }
+        fprintf(stderr,"\n");
+      }
+      return pol[k];
+    }
   }
   return 0;
 }

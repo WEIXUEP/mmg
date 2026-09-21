@@ -636,6 +636,11 @@ MMG5_int MMG5_swpmsh(MMG5_pMesh mesh,MMG5_pSol met,MMG3D_pPROctree PROctree, int
           if ( ier <  0 )
             return -1;
           else if ( ier ) {
+            if ( getenv("MMG_TRACE_BOUNDARY_CURSOR") )
+              fprintf(stderr,"MMG_BOUNDARY_CURSOR start %" MMG5_PRId
+                  " face %d face_edge %d local_edge %d edge %" MMG5_PRId
+                  " %" MMG5_PRId " ring %d\n",k,(int)i,(int)j,(int)ia,
+                  pt->v[MMG5_iare[ia][0]],pt->v[MMG5_iare[ia][1]],ilist);
             ier = MMG5_swpbdy(mesh,met,list,ret,it1,PROctree,typchk);
             if ( ier > 0 )  ns++;
             else if ( ier < 0 )  return -1;
@@ -678,7 +683,7 @@ MMG5_int MMG5_swptet(MMG5_pMesh mesh,MMG5_pSol met,double crit,double declic,
   MMG5_int      k,ns,nns,nconf;
   int8_t        i;
 
-  maxit = 2;
+  maxit = 4;
   it = nns = 0;
 
   do {
