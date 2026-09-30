@@ -125,12 +125,19 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/src/common/mmgversion.h.in
 # Print git hash to source file
 IF (NOT WIN32 OR MINGW)
 
-  ADD_CUSTOM_TARGET(GenerateGitHashMmg
-    COMMAND ./git_log_mmg.sh ${PROJECT_SOURCE_DIR} ${MMGCOMMON_BINARY_DIR}
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/
-    COMMENT "Getting git commit hash"
-    BYPRODUCTS ${MMGCOMMON_BINARY_DIR}/git_log_mmg.h
-  )
+  IF (MINGW)
+    ADD_CUSTOM_TARGET(GenerateGitHashMmg
+      COMMAND bash ./git_log_mmg.sh ${PROJECT_SOURCE_DIR} ${MMGCOMMON_BINARY_DIR}
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/
+      COMMENT "Getting git commit hash"
+      BYPRODUCTS ${MMGCOMMON_BINARY_DIR}/git_log_mmg.h)
+  ELSE ()
+    ADD_CUSTOM_TARGET(GenerateGitHashMmg
+      COMMAND ./git_log_mmg.sh ${PROJECT_SOURCE_DIR} ${MMGCOMMON_BINARY_DIR}
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/scripts/
+      COMMENT "Getting git commit hash"
+      BYPRODUCTS ${MMGCOMMON_BINARY_DIR}/git_log_mmg.h)
+  ENDIF ()
 ENDIF ()
 
 ###############################################################################
