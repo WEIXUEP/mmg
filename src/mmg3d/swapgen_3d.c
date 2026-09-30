@@ -69,7 +69,17 @@ MMG5_int MMG5_chkswpgen(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int start,int ia,
   pt0 = &mesh->tetra[0];
   na  = pt->v[MMG5_iare[ia][0]];
   nb  = pt->v[MMG5_iare[ia][1]];
-  trace_target = getenv("MMG_TRACE_SWAP_PARITY") != NULL;
+  /* This function is called millions of times in a mesh optimization pass.
+   * Cache the debug-only environment switch instead of doing a CRT getenv
+   * lookup on every edge-shell traversal. */
+#ifdef _MSC_VER
+  static __declspec(thread) int cached_trace_target = -1;
+#else
+  static __thread int cached_trace_target = -1;
+#endif
+  if (cached_trace_target < 0)
+    cached_trace_target = getenv("MMG_TRACE_SWAP_PARITY") != NULL;
+  trace_target = cached_trace_target;
   calold = pt->qual;
 
   /* Store shell of ia in list, and associated pseudo polygon in pol */
