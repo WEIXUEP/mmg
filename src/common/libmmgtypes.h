@@ -552,6 +552,7 @@ typedef struct {
   int8_t        sethmax; /*!< 1 if user set hmin, 0 otherwise (needed for multiple library calls) */
   uint8_t       ani, optim, optimLES, noinsert, noswap, nomove, nosurf, nosizreq;
   uint8_t       metRidTyp;
+  uint8_t       preservemet; /*!< Explicit fixed-shell optimization with the supplied tensor field. */
   char          *fparam; /*!< name of the parameter file */
   /*!< metRidTyp
    * - in 3D: 0 for a classical storage of the aniso

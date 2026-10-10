@@ -983,6 +983,24 @@ int MMG3D_mmg3dlib(MMG5_pMesh mesh,MMG5_pSol met) {
   assert ( mesh->point );
   assert ( mesh->tetra );
 
+  if ( mesh->info.preservemet ) {
+    MMG5_int k;
+    if ( !met->m || met->np != mesh->np || met->size != 6 ||
+         !mesh->info.noinsert || !mesh->info.nomove || !mesh->info.nosurf ||
+         mesh->info.optim || mesh->info.optimLES || mesh->info.iso ||
+         mesh->info.isosurf || mesh->info.hsiz > 0. ||
+         mesh->info.hgrad > 0. || mesh->info.hgradreq > 0. ) {
+      fprintf(stderr,"\n  ## Error: fixed-metric optimization requires a supplied tensor field and frozen nodes/surfaces.\n");
+      return MMG5_STRONGFAILURE;
+    }
+    for (k=1; k<=mesh->np; ++k) {
+      if ( MG_VOK(&mesh->point[k]) && !(mesh->point[k].tag & MG_REQ) ) {
+        fprintf(stderr,"\n  ## Error: fixed-metric optimization requires every input vertex to be required.\n");
+        return MMG5_STRONGFAILURE;
+      }
+    }
+  }
+
   MMG5_version(mesh,"3D");
 
   MMG3D_Set_commonFunc();

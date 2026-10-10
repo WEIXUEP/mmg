@@ -2219,6 +2219,10 @@ int MMG3D_Set_iparameter(MMG5_pMesh mesh, MMG5_pSol sol, int iparam,MMG5_int val
   case MMG3D_IPARAM_nosizreq :
     mesh->info.nosizreq = val;
     break;
+  case MMG3D_IPARAM_preservemet :
+    if ( val != 0 && val != 1 ) return 0;
+    mesh->info.preservemet = val;
+    break;
   case MMG3D_IPARAM_numberOfLocalParam :
     if ( mesh->info.par ) {
       MMG5_DEL_MEM(mesh,mesh->info.par);
@@ -2338,6 +2342,8 @@ int MMG3D_Get_iparameter(MMG5_pMesh mesh, MMG5_int iparam) {
   case MMG3D_IPARAM_nosurf :
     return  mesh->info.nosurf;
     break;
+  case MMG3D_IPARAM_preservemet :
+    return mesh->info.preservemet;
   case MMG3D_IPARAM_nreg :
     return mesh->info.nreg;
     break;

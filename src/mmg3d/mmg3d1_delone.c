@@ -1044,7 +1044,7 @@ int MMG5_mmg3d1_delone(MMG5_pMesh mesh,MMG5_pSol met,MMG5_int *permNodGlob) {
   if ( abs(mesh->info.imprim) > 4 || mesh->info.ddebug )
     fprintf(stdout,"  ** GEOMETRIC MESH\n");
 
-  if ( !MMG5_anatet(mesh,met,1,0) ) {
+  if ( !mesh->info.preservemet && !MMG5_anatet(mesh,met,1,0) ) {
     fprintf(stderr,"\n  ## Unable to split mesh. Exiting.\n");
     return 0;
   }

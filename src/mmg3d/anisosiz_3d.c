@@ -1318,6 +1318,19 @@ int MMG3D_defsiz_ani(MMG5_pMesh mesh,MMG5_pSol met) {
   int8_t        i;
   static int8_t mmgErr = 0;
 
+  if ( mesh->info.preservemet ) {
+    /* The caller has already projected and limited the physical metric.
+     * Required/feature-point geometric metrics must not replace that field. */
+    if ( !met->m || met->size != 6 || !mesh->info.noinsert ||
+         !mesh->info.nomove || !mesh->info.nosurf || mesh->info.optim ||
+         mesh->info.hgrad > 0. || mesh->info.hgradreq > 0. ) return 0;
+    for (k=1; k<=mesh->np; ++k) {
+      if ( MG_VOK(&mesh->point[k]) && !(mesh->point[k].tag & MG_REQ) ) return 0;
+    }
+    mesh->info.metRidTyp = 0;
+    return 1;
+  }
+
   if ( !MMG5_defsiz_startingMessage (mesh,met,__func__) ) {
     return 0;
   }
