@@ -177,11 +177,12 @@ enum MMG3D_Param {
   MMG3D_DPARAM_ls,                        /*!< [val], Function value where the level set is to be discretized */
   MMG3D_DPARAM_xreg,                      /*!< [val], Relaxation parameter for boundary regularization (0<val<1) */
   MMG3D_DPARAM_rmc,                       /*!< [-1/val], Remove small disconnected components in level-set mode */
-  MMG3D_IPARAM_preservemet,               /*!< [0/1], Preserve supplied tensors during fixed-node, fixed-surface optimization */
+  MMG3D_IPARAM_preservemet,               /*!< [0/1], Preserve supplied tensors during fixed-surface optimization; with nomove=0, required vertices remain fixed and other interior vertices may move */
   MMG3D_PARAM_size,                       /*!< [n], Number of parameters */
 };
 
 #define MMG3D_HAS_FIXED_METRIC 1
+#define MMG3D_HAS_CONSTRAINED_METRIC_MOTION 1
 
 /*--------------------------- function headers ---------------------------*/
 /* Initialization functions */
