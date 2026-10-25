@@ -530,7 +530,7 @@ void MMG5_excfun(int sigid) {
  *   - MMG_ASSIGN_NULL is empty in .h file and setted to =NULL in .c one.
  */
 #define FUNCTION_POINTER(fproto)\
-  MMG_EXTERN fproto MMG_ASSIGN_NULL
+  MMG_EXTERN LIBMMG_CORE_EXPORT fproto MMG_ASSIGN_NULL
 
 
 
